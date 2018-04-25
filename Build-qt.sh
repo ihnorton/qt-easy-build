@@ -1,13 +1,17 @@
 #!/bin/bash
 set -e
+set -x
 set -o pipefail
+
+# ERISOne build: must load newer GCC
+#module load gcc/7.1.0
 
 #
 # Configuration
 #
 
 # Qt version (major.minor.revision)
-QT_VERSION=5.10.0
+QT_VERSION=5.9.5
 
 # OpenSSL version
 OPENSSL_VERSION=1.0.2n
@@ -15,7 +19,9 @@ OPENSSL_MIDAS_PACKAGES_ITEM=10337
 
 # MD5 checksums
 OPENSSL_MD5="13bdc1b1d1ff39b6fd42a255e74676a4"
-QT_MD5="c5e275ab0ed7ee61d0f4b82cd471770d"
+QT_MD5="0e6eaa2d118f9854345c2debb12e8536"
+#QT_MD5="7e167b9617e7bd64012daaacb85477af"
+       # old: c5e275ab0ed7ee61d0f4b82cd471770d"
 
 QT_SRC_ARCHIVE_EXT="tar.xz"
 
@@ -27,7 +33,7 @@ QT_MAJOR_MINOR_VERSION=$(echo $QT_VERSION | awk -F . '{ print $1"."$2 }')
 
 # Defaults
 clean=0
-nbthreads=1
+nbthreads=12
 confirmed=0
 qt_targets=
 
@@ -40,11 +46,6 @@ fi
 
 export CFLAGS=""
 export CXXFLAGS=""
-
-die() {
-  printf >&2 "$1\n"
-  exit 1
-}
 
 show_help() {
 cat << EOF
@@ -134,13 +135,13 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-command_not_found_install_hint="\n=> Consider installing the program using a package manager (apt-get, yum, homebrew, ...)"
-
 openssl_archive=openssl-$OPENSSL_VERSION.tar.gz
 openssl_download_url=https://packages.kitware.com/download/item/$OPENSSL_MIDAS_PACKAGES_ITEM/$openssl_archive
 
-qt_archive=qt-everywhere-src-$QT_VERSION.${QT_SRC_ARCHIVE_EXT}
-qt_download_url=https://download.qt.io/official_releases/qt/$QT_MAJOR_MINOR_VERSION/$QT_VERSION/single/$qt_archive
+qt_archive=qt-everywhere-opensource-src-$QT_VERSION.${QT_SRC_ARCHIVE_EXT}
+#qt_download_url=https://download.qt.io/official_releases/qt/$QT_MAJOR_MINOR_VERSION/$QT_VERSION/single/$qt_archive
+# main mirror is blocked at partners.
+qt_download_url=http://qtmirror.ics.com/pub/qtproject/official_releases/qt/5.9/5.9.5/single/qt-everywhere-opensource-src-5.9.5.tar.xz
 
 cwd=$(pwd)
 
@@ -148,7 +149,7 @@ cwd=$(pwd)
 deps_dir="$cwd/qt-everywhere-deps-$QT_VERSION"
 
 # Source and Build directory
-src_dir="$cwd/qt-everywhere-src-$QT_VERSION"
+src_dir="$cwd/qt-everywhere-opensource-src-$QT_VERSION"
 
 # Install directory
 if [[ -z $install_dir ]]
@@ -163,16 +164,9 @@ then
   cmake=`which cmake`
   if [ $? -ne 0 ]
   then
-    die "error: 'cmake' not found ! ${command_not_found_install_hint}"
+    echo "cmake not found"
+    exit 1
   fi
-fi
-
-if ! command -v curl &> /dev/null; then
-  die "error: 'curl' not found ! ${command_not_found_install_hint}"
-fi
-
-if ! command -v git &> /dev/null; then
-  die "error: 'git' not found ! ${command_not_found_install_hint}"
 fi
 
 # Set macOS options
@@ -242,7 +236,8 @@ then
   then
     confirmed=1
   else
-    die "Aborting ..."
+    echo "Aborting ..."
+    exit 1
   fi
 fi
 
@@ -295,11 +290,13 @@ else
 fi
 if [ "$md5_openssl" != "$OPENSSL_MD5" ]
 then
-  die "MD5 mismatch. Problem downloading OpenSSL"
+  echo "MD5 mismatch. Problem downloading OpenSSL"
+  exit 1
 fi
 if [ "$md5_qt" != "$QT_MD5" ]
 then
-  die "MD5 mismatch. Problem downloading Qt"
+  echo "MD5 mismatch. Problem downloading Qt"
+  exit 1
 fi
 
 # Build zlib
@@ -349,7 +346,7 @@ cd ..
 popd
 
 # Build Qt
-echo "Build Qt"
+echo "Build Qt in: $src_dir"
 
 cwd=$(pwd)
 
@@ -362,13 +359,23 @@ then
 fi
 cd $src_dir
 
-./configure $qt_install_dir_options                           \
+# qtwebengine requires glibc >= 2.17
+./configure $qt_install_dir_options \
   -release -opensource -confirm-license \
   -c++std c++11 \
+  -skip qtwebengine \ 
   -nomake examples \
   -nomake tests \
-  -no-rpath \
   -silent \
+  -qt-xcb \
+  -qt-zlib \
+  -qt-libjpeg \
+  -qt-libpng \
+  -qt-xkbcommon \
+  -qt-freetype \
+  -qt-pcre \
+  -qt-freetype \
+  -qt-harfbuzz \
   -openssl -I $deps_dir/openssl-$OPENSSL_VERSION/include           \
   ${qt_macos_options}                                         \
   -L $deps_dir/openssl-$OPENSSL_VERSION
