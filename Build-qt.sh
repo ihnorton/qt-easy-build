@@ -250,14 +250,14 @@ pushd $deps_dir
 echo "Download openssl"
 if ! [ -f $openssl_archive ]
 then
-  curl -# -OL $openssl_download_url
+  curl --tlsv1.2 -# -OL $openssl_download_url
 else
   echo "  skipping (found $openssl_archive)"
 fi
 echo "Download Qt"
 if ! [ -f $qt_archive ]
 then
-  curl -# -OL $qt_download_url
+  curl --tlsv1.2 -# -OL $qt_download_url
 else
   echo "  skipping (found $qt_archive)"
 fi
@@ -360,10 +360,25 @@ cd $src_dir
 ./configure $qt_install_dir_options \
   -release -opensource -confirm-license \
   -c++std c++11 \
+  -silent \
   -nomake examples \
   -nomake tests \
   $no_rpath_option \
-  -silent \
+  -skip qtgamepad \
+  -skip qtcharts \
+  -skip qt3d \
+  -skip qtandroidextras \
+  -skip qtpurchasing \
+  -skip qtserialbus \
+  -skip qtserialport \
+  -skip qtwayland \
+  -skip qtspeech \
+  -skip qtlocation \
+  -skip qtquickcontrols \
+  -skip qtquickcontrols2 \
+  -skip qtsensors \
+  -skip qtcanvas3d \
+  -skip qtdoc \
   -qt-xcb \
   -qt-zlib \
   -qt-libjpeg \
